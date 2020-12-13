@@ -1,11 +1,8 @@
 from __future__ import division
 from common import *
-import operator
-import collections
 from intbitset import *
 import networkx as nx
 import community as louvain
-from collections import defaultdict
 import numpy as np
 import otsu
 import array as arr
