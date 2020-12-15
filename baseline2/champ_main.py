@@ -167,6 +167,7 @@ def getChangedGT(edge_dic, max_val):
 if __name__ == '__main__':
 	parser = ArgumentParser(description='Process some parameters.')
 	parser.add_argument('-f', metavar='filename', type=str, nargs = '?', help='file with edgelist')
+	parser.add_argument('-alg', metavar='alg', type=str, nargs = '?', default = 'louvain' , help='choose from \'louvain\' , \'infomap\' ,\'lpm\' ')
 	args = parser.parse_args()
 
 	G = nx.read_edgelist(args.f, nodetype=int)
@@ -180,7 +181,15 @@ if __name__ == '__main__':
 
 	all_partition = []
 	for i in range(n_p):
-		partition = getCommunitiesLouvain(G, edge_dic)
+		if args.alg == 'louvain':
+			partition = getCommunitiesLouvain(G, edge_dic)
+		elif args.alg == 'infomap':
+			partition = getCommunitiesInfoMap(G, edge_dic)
+		elif args.alg == 'lpm':
+			partition = getLabelProp(G, edge_dic)
+		else:
+			print('Choose proper algorithms')
+			exit(0)
 		all_partition.append(partition)
 
 	'''
