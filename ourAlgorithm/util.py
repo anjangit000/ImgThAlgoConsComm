@@ -172,6 +172,7 @@ def computeTriangle(v1, v2, node_triangle_dic, no_of_triangles):
 	else:
 		node_triangle_dic[v2] = no_of_triangles
 
+'''
 def computeParameters2(G, edge_dic):
 	capacity = 20000
 	buffer_cap = 5000
@@ -224,14 +225,12 @@ def computeParameters2(G, edge_dic):
 		else:
 			nbd_v1 = getNbd(G, v1, capacity, nbd_dic)
 		nbd_v2 = getNbd(G, v2, capacity, nbd_dic)
-
-		#print(e, nbd_v1, nbd_v2)		
+		
 		set_intersection = nbd_v1 & nbd_v2
 
 		no_of_triangles = len(set_intersection)
 		computeTriangle(v1, v2, node_triangle_dic, no_of_triangles)
 
-		
 		k1 = 0 
 		for i1 in set_intersection:
 			#if node_deg[i1] == 2:
@@ -290,8 +289,116 @@ def computeParameters2(G, edge_dic):
 		edge_prop_dic[e].append(tri_ratio)
 		
 	return JIdic, CCdic, Mccdic, Tridic, B0, B100, Rest_edges1, edge_prop_dic
-
+'''
 		
+def computeParameters2(G, edge_dic):
+	capacity = 20000
+	buffer_cap = 5000
+	node_deg = dict(G.degree())
+	node_triangle_dic = {}
+	JIdic = {}
+	CCdic = {}
+	Mccdic = {}
+	Tridic = {}
+	B0 = []
+	B100 = []
+	Orig0 = []
+	Orig100 = []
+	nbd_dic = {}
+	Rest_edges1 = []
+	v = -1
+	s = {}
+	edge_prop_dic = {}
+	i = 0
+	for e in G.edges():
+		v1 = e[0]
+		v2 = e[1]
+		e = getEdge(e)
+		if edge_dic[e] == no_of_perm:
+			Orig100.append(e)
+		else:
+			Orig0.append(e)
+
+
+		if node_deg[v1] == 1 or node_deg[v2] == 1:
+			B100.append(e)
+			computeTriangle(v1, v2, node_triangle_dic, 0)
+			edge_prop_dic[e] = arr.array('d',[0, 0, 0, 0, node_deg[v1]+node_deg[v2]-1])
+			Makecounter(JIdic, 0)
+			Makecounter(CCdic, 0)
+			continue
+
+
+		if len(nbd_dic) >= capacity and v1 not in nbd_dic:
+			if v != v1:
+				nbd_v1 = intbitset([n1 for n1 in G.neighbors(v1)])
+				s = nbd_v1
+				v = v1
+			else:
+				nbd_v1 = s
+		else:
+			nbd_v1 = getNbd(G, v1, capacity, nbd_dic)
+		nbd_v2 = getNbd(G, v2, capacity, nbd_dic)
+		
+		set_intersection = nbd_v1 & nbd_v2
+
+		no_of_triangles = len(set_intersection)
+		computeTriangle(v1, v2, node_triangle_dic, no_of_triangles)
+
+		k1 = 0 
+		for i1 in set_intersection:
+			#if node_deg[i1] == 2:
+				#continue
+			nbd_i1 = getNbd(G, i1, capacity, nbd_dic)
+			k1 += len(nbd_i1 & set_intersection)
+
+
+ 		
+		ji = round(computeJI((node_deg[v1] + node_deg[v2] - no_of_triangles - 1), no_of_triangles),2)
+		#if ji >= 1:
+			#print([n1 for n1 in G.neighbors(v1)], [n2 for n2 in G.neighbors(v2)], no_of_triangles)
+		cc = round(computeCC(k1//2, no_of_triangles),2)
+		common_tri = no_of_triangles
+
+		Makecounter(JIdic, ji)
+		Makecounter(CCdic, cc)
+
+
+		edge_prop_dic[e] = arr.array('d',[ji, cc, k1, common_tri, node_deg[v1]+node_deg[v2]-common_tri-1])
+		
+		
+		#if ji == 0 and node_deg[v2] > 2 and node_deg[v1] > 2:
+			#B0.append(e)
+		
+		if ji > 0 and (node_deg[v2] == 2 or node_deg[v1] == 2):
+			B100.append(e)	
+		else:
+			Rest_edges1.append(e)
+		
+		#print(e,i)
+		i += 1
+		#Rest_edges1.append(e)
+
+	for e in G.edges():
+		e = getEdge(e)
+		left = node_triangle_dic[e[0]]
+		right = node_triangle_dic[e[1]]
+		inter = edge_prop_dic[e][2]
+		num = (left + right - inter)//2 + edge_prop_dic[e][4]
+		den = (node_deg[e[0]] + node_deg[e[1]] - edge_prop_dic[e][3])
+		mcc = round(computeModifiedCC(num, den),2)
+		Makecounter(Mccdic, mcc)
+		edge_prop_dic[e].append(mcc)
+		den = (left+right-inter)
+		if den == 0:
+			tri_ratio = 0
+		else:
+			tri_ratio = round(inter/den,2)
+		Makecounter(Tridic, tri_ratio)
+		edge_prop_dic[e].append(tri_ratio)
+
+	return JIdic, CCdic, Mccdic, Tridic, B0, B100, Rest_edges1, edge_prop_dic
+
 
 ########################### computing the parameters - end ###########################
 

@@ -1,1 +1,1 @@
-python3 main.py -f "../sampleGraphs/karate_nx.txt" -th "multi"
+python3 main.py -f "../sampleGraphs/dolphin_nx.txt" -th "multiItr+"
