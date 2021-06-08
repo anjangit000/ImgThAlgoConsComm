@@ -110,20 +110,20 @@ def initializeMap(nodes1, nodes2):
 	return nodemap
 
 def getBelongingness(G, algo):
-	print('===============================')
+	#print('===============================')
 	if algo == 'louvain':#Louvain
-		print('Louvain')
+		#print('Louvain')
 		algoNo = 0
 	elif algo == 'infomap':#Infomap
-		print('Infomap')
+		#print('Infomap')
 		algoNo = 1
 	elif algo == 'lpm':#label propagation
-		print('Label Propagation')
+		#print('Label Propagation')
 		algoNo = 2
 	else:#walk trap
-		print('WalkTrap')
+		#print('WalkTrap')
 		algoNo = 3
-	print('===============================')
+	#print('===============================')
 	nodes = list(G.nodes())
 	shuffNodes = list(G.nodes())
 	edge_dic = {}

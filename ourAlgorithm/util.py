@@ -403,6 +403,64 @@ def computeParameters2(G, edge_dic):
 ########################### computing the parameters - end ###########################
 
 ########################### computing the Filter class - start ###########################
+def plotBar(propDic, xlabel='D_both', ylabel='frequency', color='r', threshold=0.5):
+    import matplotlib.pyplot as plt
+    x = [] 
+    y = []
+    for key in (sorted(propDic)):
+        x.append(key*10)
+        y.append(propDic[key])
+
+    fig, ax = plt.subplots()
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.bar(x, y, width=0.2, color=color)
+    ax.axvline(x=threshold*10, color='k')
+    plt.show()
+
+def plotBar2(propDic1, propDic2, propDic3, propDic4, th1, th2, th3, th4):
+    import matplotlib.pyplot as plt
+    x1 = []; x2 = []; x3 = []; x4 = []; y1 = []; y2 = []; y3 = []; y4 = []
+    for key in (sorted(propDic1)):
+        x1.append(key*10)
+        y1.append(propDic1[key])
+    for key in (sorted(propDic2)):
+        x2.append(key*10)
+        y2.append(propDic2[key])
+    for key in (sorted(propDic3)):
+        x3.append(key*10)
+        y3.append(propDic3[key])
+    for key in (sorted(propDic4)):
+        x4.append(key*10)
+        y4.append(propDic4[key])
+
+    ylabel = 'frequency'
+    ax = plt.subplot(2,2,1)
+    ax.set_xlabel('D_both')
+    ax.set_ylabel(ylabel)
+    ax.bar(x1, y1, width=0.2, color='r')
+    ax.axvline(x=th1*10, color='k')
+
+    ax = plt.subplot(2,2,2)
+    ax.set_xlabel('D_any')
+    ax.set_ylabel(ylabel)
+    ax.bar(x2, y2, width=0.2, color='g')
+    ax.axvline(x=th2*10, color='k')
+
+    ax = plt.subplot(2,2,3)
+    ax.set_xlabel('D_tri')
+    ax.set_ylabel(ylabel)
+    ax.bar(x3, y3, width=0.2, color='b')
+    ax.axvline(x=th3*10, color='k')
+
+    ax = plt.subplot(2,2,4)
+    ax.set_xlabel('JI')
+    ax.set_ylabel(ylabel)
+    ax.bar(x4, y4, width=0.2, color='c')
+    ax.axvline(x=th4*10, color='k')
+
+    plt.show()
+
 
 def computeFilteredBinaryOtsu(G, edge_dic):
 	JIdic, CCdic, Mccdic, Tridic, B0, B100, Rest_edges, edge_prop_dic = computeParameters2(G, edge_dic)
@@ -411,6 +469,8 @@ def computeFilteredBinaryOtsu(G, edge_dic):
 	T_mcc_otsu = computeOtsuThreshold2(Mccdic)
 	T_tri_otsu = computeOtsuThreshold2(Tridic)
 	print(T_ji_otsu, T_cc_otsu, T_mcc_otsu, T_tri_otsu)
+	#plotBar(CCdic, xlabel = 'D_both', ylabel = 'frequency', color = 'r', threshold = T_cc_otsu)
+	#plotBar2(CCdic, Mccdic, Tridic, JIdic, T_cc_otsu, T_mcc_otsu, T_tri_otsu, T_ji_otsu)
 	CM = [[0,0],[0,0]]
 	
 	for e in Rest_edges:

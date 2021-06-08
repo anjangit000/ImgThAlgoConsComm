@@ -75,6 +75,7 @@ def initializeMap(nodes1, nodes2):
 	return nodemap
 
 def getBelongingness(G, no_of_perm, algoNo):
+	'''
 	print('===============================')
 	if algoNo == 0:
 		print('Louvain')
@@ -85,6 +86,8 @@ def getBelongingness(G, no_of_perm, algoNo):
 	else:
 		print('Label Propagation')
 	print('===============================')
+	'''
+	algoNo = 0
 	nodes = list(G.nodes())
 	shuffNodes = list(G.nodes())
 	edge_dic = {}
