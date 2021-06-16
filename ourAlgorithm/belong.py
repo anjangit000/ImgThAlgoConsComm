@@ -73,8 +73,7 @@ def getCommunitiesWalkTrap(G2):
 	return comm_list
 
 def getLabelProp(G):
-	#partition = nx.algorithms.community.label_propagation_communities(G)
-	partition = nx.algorithms.community.asyn_lpa_communities(G)
+	partition = nx.algorithms.community.label_propagation_communities(G)
 	comm_list = []
 	for com in partition:
 		temp_list = []
