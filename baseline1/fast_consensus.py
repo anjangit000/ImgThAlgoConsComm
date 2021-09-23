@@ -7,7 +7,7 @@ import random
 import igraph as ig
 from networkx.algorithms import community
 import networkx.algorithms.isolate
-import community.community_louvain as cm
+import community as cm
 import math
 import random
 import argparse

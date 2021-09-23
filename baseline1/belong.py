@@ -2,7 +2,7 @@ from __future__ import division
 from common import *
 import random as rnd
 import networkx as nx
-import community.community_louvain as louvain
+import community as louvain
 import igraph
 #from networkx.algorithms.community import LFR_benchmark_graph
 
@@ -34,10 +34,20 @@ def getCommunitiesLouvain(G):
 	return comm_list
 
 def getCommunitiesInfoMap(G2):
-	p = G2.community_infomap()
+	import infomap
+	from collections import defaultdict
+	s = rnd.randint(-100000, 100000)
+	info = infomap.Infomap("--two-level --silent -s "+str(s))
+	for e in list(G2.edges()):
+		info.addLink(*e)
+	info.run()
+	c = info.getModules() #node:community
+	com = defaultdict(list) 
+	for u in c:
+		com[c[u]].append(u) #community:[nodes]
 	comm_list = []
-	for com in p:
-		comm_list.append(com)
+	for key in com:
+		comm_list.append(com[key])
 	return comm_list
 
 def getCommunitiesWalkTrap(G2):
@@ -104,7 +114,7 @@ def getBelongingness(G, no_of_perm, algoNo):
 			G1 = getNXGraph(G, ShuffNodeMap)
 			next_level_communities = getCommunitiesLouvain(G1)
 		elif algoNo == 1:
-			G1 = getIGGraph(G, ShuffNodeMap)
+			G1 = getNXGraph(G, ShuffNodeMap)
 			next_level_communities = getCommunitiesInfoMap(G1)
 		elif algoNo == 2:
 			G1 = getIGGraph(G, ShuffNodeMap)
