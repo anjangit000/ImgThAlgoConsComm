@@ -97,7 +97,6 @@ def getBelongingness(G, no_of_perm, algoNo):
 		print('Label Propagation')
 	print('===============================')
 	'''
-	algoNo = 0
 	nodes = list(G.nodes())
 	shuffNodes = list(G.nodes())
 	edge_dic = {}
