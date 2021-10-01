@@ -96,11 +96,12 @@ def getFrequency(G, RevShuffNodeMap, next_level_communities, nodes, edge_dic):
 		#print comm_set
 		for i in range(len(comm_set)):
 			for j in range(i, len(comm_set)):
-				if G.has_edge(RevShuffNodeMap[comm_set[i]], RevShuffNodeMap[comm_set[j]]):
-					if RevShuffNodeMap[comm_set[i]] > RevShuffNodeMap[comm_set[j]]:
-						edge_dic[(RevShuffNodeMap[comm_set[j]], RevShuffNodeMap[comm_set[i]])] = edge_dic[(RevShuffNodeMap[comm_set[j]], RevShuffNodeMap[comm_set[i]])] + 1
-					else:
-						edge_dic[(RevShuffNodeMap[comm_set[i]], RevShuffNodeMap[comm_set[j]])] = edge_dic[(RevShuffNodeMap[comm_set[i]], RevShuffNodeMap[comm_set[j]])] + 1
+				if comm_set[i] in RevShuffNodeMap and comm_set[j] in RevShuffNodeMap:
+					if G.has_edge(RevShuffNodeMap[comm_set[i]], RevShuffNodeMap[comm_set[j]]):
+						if RevShuffNodeMap[comm_set[i]] > RevShuffNodeMap[comm_set[j]]:
+							edge_dic[(RevShuffNodeMap[comm_set[j]], RevShuffNodeMap[comm_set[i]])] = edge_dic[(RevShuffNodeMap[comm_set[j]], RevShuffNodeMap[comm_set[i]])] + 1
+						else:
+							edge_dic[(RevShuffNodeMap[comm_set[i]], RevShuffNodeMap[comm_set[j]])] = edge_dic[(RevShuffNodeMap[comm_set[i]], RevShuffNodeMap[comm_set[j]])] + 1
 
 def initializeMap(nodes1, nodes2):
 	nodemap = {}
