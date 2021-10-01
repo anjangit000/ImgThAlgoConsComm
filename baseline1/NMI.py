@@ -145,7 +145,7 @@ def findSymmDiff(X_alg,Y_ji):
 #G=nx.read_edgelist("../TINY_100K/email_nx.txt", nodetype=int)
 #n = 2000000
 def getNode(G):
-	return G.number_of_nodes()*50
+	return G.number_of_nodes()*800
 '''
 if __name__ == '__main__':
 	print('email_nx')
