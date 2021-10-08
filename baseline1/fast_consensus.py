@@ -497,8 +497,5 @@ if __name__ == "__main__":
     print('*********************************************')
     print('Macro F1: ',getAvg(MF1))
 
-    if args.nmi == 'True':
-        gt_comm = getCommunityFromEdgeDic(G, edge_dic)
-        findNMI(comlist, gt_comm, G)
-    
+
     
