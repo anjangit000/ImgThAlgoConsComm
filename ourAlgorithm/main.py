@@ -26,8 +26,3 @@ if __name__ == "__main__":
     elif args.th == 'multiItr+':
         B0, B100 = computeFilteredHist_multiOtsu_repeatedHeighest_addWedge(G, edge_dic)
 
-    #compute the nmi
-    if args.nmi == 'True':
-        B100_comm = connectedComponents(G, B100)
-        gt_comm = getCommunityFromEdgeDic(G, edge_dic)
-        findNMI(B100_comm, gt_comm, G)
