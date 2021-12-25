@@ -6,7 +6,6 @@ import community as louvain
 import infomap
 import random as rnd
 from tqdm import tqdm
-from NMI import *
 import copy as copy
 from argparse import ArgumentParser
 
@@ -227,12 +226,10 @@ if __name__ == '__main__':
 		computeCM2(B100, 1, CM, edge_dic)
 
 		B100_comm = connectedComponents(G, B100)
-		nmi += findNMI(B100_comm, gt_comm, G)
 		f1_100 += ComputePRA2(CM)
 		print("---------------------------------------------------------------------------")
 	print("---------------------------------------------------------------------------")
 	print("---------------------------------------------------------------------------")
 
 	print('F1 score for B100:',f1_100/len(ind2doms))
-	print('nmi: ',nmi/len(ind2doms))
 
