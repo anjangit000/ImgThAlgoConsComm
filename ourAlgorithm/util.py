@@ -1338,6 +1338,165 @@ def getGroundTruth(fileName1, fileName2):
 
 	return edge_dic
 
+
+
+
+
+
+def computeHistConvexHull(hist):
+    from numpy import ones,vstack
+    from numpy.linalg import lstsq
+    
+    sorted_x = sorted(hist)
+    selected_high_slope_x = [sorted_x[0]]
+    selected_x = None
+    init_index_x = 0
+    while init_index_x < len(sorted_x)-1:
+        #print(init_index_x)
+        x0 = sorted_x[init_index_x]
+        y0 = hist[x0]
+        max_slope = -5555555
+        for j in range(init_index_x+1, len(sorted_x)):
+            x1 = sorted_x[j]
+            y1 = hist[x1]
+            num = (y1 - y0)
+            den = (x1 - x0)
+            slope = num/den
+            if slope > max_slope:
+                max_slope = slope
+                selected_x = x1
+        init_index_x = sorted_x.index(selected_x) #update the init point
+        selected_high_slope_x.append(selected_x) 
+        
+    #find the deepest concavity points as thresholds
+    init_x = selected_high_slope_x[0]
+    init_y = hist[init_x]
+    thresholds = []
+    max_diff_all = []
+    for next_x in selected_high_slope_x[1:]:
+        next_y = hist[next_x]
+        points = [(init_x, init_y),(next_x, next_y)]
+        x_coords, y_coords = zip(*points)
+        A = vstack([x_coords,ones(len(x_coords))]).T
+        m, c = lstsq(A, y_coords, rcond=None)[0]
+        #get the max depth
+        max_diff = 0
+        selected_x_l = None
+        for x_l in np.arange(init_x, next_x, 0.01):
+            y_l = m*x_l + c #get the point in the convex side
+            y_hist = 0 if x_l not in sorted_x else hist[x_l]
+            diff = y_l - y_hist
+            if diff >= max_diff:
+                max_diff = diff
+                selected_x_l = x_l
+        max_diff_all.append(max_diff)
+        thresholds.append(selected_x_l)        
+        init_x = next_x
+        init_y = next_y
+    
+    #get the index of max diff
+    max_dif_index = max_diff_all.index(max(max_diff_all))
+    #get the corresponding threshold
+    th = thresholds[max_dif_index]
+    return th
+        
+def computeFilteredConvex(G, edge_dic, path=None):
+	JIdic, CCdic, Mccdic, Tridic, B0, B100, Rest_edges, edge_prop_dic = computeParameters2(G, edge_dic)
+	#dumpProp(JIdic, CCdic, Mccdic, Tridic, B0, B100, Rest_edges, edge_prop_dic, path)
+	#JIdic, CCdic, Mccdic, Tridic, B0, B100, Rest_edges, edge_prop_dic = loadProp(path)
+
+	T_ji_otsu = computeHistConvexHull(JIdic)
+	T_cc_otsu = computeHistConvexHull(CCdic)
+	T_mcc_otsu = computeHistConvexHull(Mccdic)
+	T_tri_otsu = computeHistConvexHull(Tridic)
+
+	CM = [[0,0],[0,0]]
+	
+	for e in Rest_edges:
+		e = getEdge(e)
+		ji = edge_prop_dic[e][0]
+		cc = edge_prop_dic[e][1]
+		mcc = edge_prop_dic[e][5]
+		tri_ratio = edge_prop_dic[e][6]
+		if (ji >= T_ji_otsu/2 and cc > T_cc_otsu/2 ) or mcc >= T_mcc_otsu or tri_ratio > T_tri_otsu/2:
+			B100.append(e)
+		else:
+			B0.append(e)
+
+	computeCM2(B0, 0, CM, edge_dic)
+	computeCM2(B100, 1, CM, edge_dic)
+
+	ComputePRA2(CM)
+
+	return B0, B100
+
+
+def computeHistBalanced(hist, min_count = 5):
+	hist = sorted(hist.items(), key=lambda x: x[0])
+	n_bins = len(hist)
+	h_s = 0
+	while hist[h_s][1] < min_count:
+		h_s += 1  # ignore small counts at start
+	h_e = n_bins - 1
+	while hist[h_e][1] < min_count:
+		h_e -= 1  # ignore small counts at end
+
+	h_c = (h_s + h_e) // 2
+	w_l = np.sum([hist[i][1] for i in range(h_s, h_c)])
+	w_r = np.sum([hist[i][1] for i in range(h_c, h_e + 1)])
+
+	#print(w_l, w_r)
+	while h_s < h_e:
+		if w_l > w_r:  # left part became heavier
+			w_l -= hist[h_s][1]
+			h_s += 1
+		else:  # right part became heavier
+			w_r -= hist[h_e][1]
+			h_e -= 1
+
+		new_c = int(round((h_e + h_s) / 2))  # re-center the weighing scale
+		if new_c < h_c:  # move bin to the other side
+			w_l -= hist[h_c][1]
+			w_r += hist[h_c][1]
+		elif new_c > h_c:
+			w_l += hist[h_c][1]
+			w_r -= hist[h_c][1]
+
+		h_c = new_c
+	print(hist[h_c][0])
+	return hist[h_c][0]
+
+def computeFilteredBalanced(G, edge_dic, path=None):
+	JIdic, CCdic, Mccdic, Tridic, B0, B100, Rest_edges, edge_prop_dic = computeParameters2(G, edge_dic)
+	#path = 'dumpProp/dblp/'
+	#dumpProp(JIdic, CCdic, Mccdic, Tridic, B0, B100, Rest_edges, edge_prop_dic, path)
+	#JIdic, CCdic, Mccdic, Tridic, B0, B100, Rest_edges, edge_prop_dic = loadProp(path)
+
+	T_ji_otsu = computeHistBalanced(JIdic)
+	T_cc_otsu = computeHistBalanced(CCdic)
+	T_mcc_otsu = computeHistBalanced(Mccdic)
+	T_tri_otsu = computeHistBalanced(Tridic)
+
+	CM = [[0,0],[0,0]]
+	
+	for e in Rest_edges:
+		e = getEdge(e)
+		ji = edge_prop_dic[e][0]
+		cc = edge_prop_dic[e][1]
+		mcc = edge_prop_dic[e][5]
+		tri_ratio = edge_prop_dic[e][6]
+		if (ji >= T_ji_otsu/2 and cc > T_cc_otsu/2 ) or mcc >= T_mcc_otsu or tri_ratio > T_tri_otsu/2:
+			B100.append(e)
+		else:
+			B0.append(e)
+
+	computeCM2(B0, 0, CM, edge_dic)
+	computeCM2(B100, 1, CM, edge_dic)
+
+	ComputePRA2(CM)
+
+	return B0, B100
+
 ########################### fetching ground truth- end ###########################
 
 def get100EdgeList(edge_dic):

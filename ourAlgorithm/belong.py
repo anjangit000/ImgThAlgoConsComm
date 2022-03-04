@@ -2,7 +2,7 @@ from __future__ import division
 from common import *
 import random as rnd
 import networkx as nx
-import community as louvain
+import community.community_louvain as louvain
 import igraph
 from collections import defaultdict
 #from networkx.algorithms.community import LFR_benchmark_graph

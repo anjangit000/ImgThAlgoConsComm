@@ -25,4 +25,10 @@ if __name__ == "__main__":
         B0, B100 = computeFilteredHist_multiOtsu_repeatedHeighest(G, edge_dic)
     elif args.th == 'multiItr+':
         B0, B100 = computeFilteredHist_multiOtsu_repeatedHeighest_addWedge(G, edge_dic)
+    elif args.th == 'convex':
+        B0, B100= computeFilteredConvex(G, edge_dic)
+    elif args.th == 'bilevel':
+        B0, B100= computeFilteredBalanced(G, edge_dic) 
+    elif args.th == 'gcn':
+        B0, B100= computeGCNLine(G, edge_dic)
 
