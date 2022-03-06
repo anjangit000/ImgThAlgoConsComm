@@ -1497,6 +1497,203 @@ def computeFilteredBalanced(G, edge_dic, path=None):
 
 	return B0, B100
 
+###################################################--GCN--######################################
+import torch
+import random as rnd
+from torch_geometric.nn import GCNConv
+from torch_geometric.data import InMemoryDataset, Data
+import torch.nn as nn
+import torch.nn.functional as F
+
+class Net(torch.nn.Module):
+	def __init__(self, dataset):
+		super(Net, self).__init__()
+		self.conv1 = GCNConv(dataset.num_node_features, 16)
+		self.conv2 = GCNConv(16, dataset.num_classes)
+
+	def forward(self, data):
+		x, edge_index = data.x, data.edge_index
+
+		x = self.conv1(x, edge_index)
+		x = F.relu(x)
+		x = F.dropout(x, training=self.training)
+		x = self.conv2(x, edge_index)
+
+		return F.log_softmax(x, dim=1)
+
+class torchData2(InMemoryDataset):
+	def __init__(self, G, featureSet=None, transform=None):
+		super(torchData2, self).__init__('.', transform, None, None)
+		adj = nx.to_scipy_sparse_matrix(G).tocoo()
+		row = torch.from_numpy(adj.row.astype(np.int64)).to(torch.long)
+		col = torch.from_numpy(adj.col.astype(np.int64)).to(torch.long)
+		edge_index = torch.stack([row, col], dim=0)
+		data = Data(edge_index=edge_index)
+		data.num_nodes = edge_index.max().item() + 1
+		if featureSet is None:
+			data.x = torch.eye(data.num_nodes, dtype=torch.float)
+		else:
+			data.x = torch.from_numpy(featureSet.detach().numpy())
+		#data.x = torch.rand(data.num_nodes, 30)
+		#y = [0 if G.nodes[i]['club'] == 'Mr. Hi' else 1 for i in G.nodes]
+		y = [0 for i in G.nodes]
+		data.y = torch.tensor(y)
+		#data.train_mask = torch.tensor(train_mask)
+		#data.test_mask = torch.tensor(test_mask)
+		self.data, self.slices = self.collate([data])
+
+	def _download(self):
+		return
+
+	def _process(self):
+		return
+
+	def __repr__(self):
+		return '{}()'.format(self.__class__.__name__)
+
+
+def computeFeatures_GCN_node(G, frac=False):
+	node_deg = dict(G.degree())
+	edgeFeature = {}
+	num_node = G.number_of_nodes()
+	num_edge = G.size()
+	for e in G.edges():
+		e = getEdge(e)
+		v1 = e[0]
+		v2 = e[1]
+		node_inter_arr = np.zeros(num_node)
+		#node_union_arr = np.zeros(num_node)
+		if node_deg[v1] == 1 or node_deg[v2] == 1:#No common nodes and edges
+			edgeFeature[e] = np.array([0 for i in range(num_node)])
+			continue
+			
+		nbd_v1 = intbitset([n1 for n1 in G.neighbors(v1)])
+		nbd_v2 = intbitset([n1 for n1 in G.neighbors(v2)])
+				
+		set_intersection = nbd_v1 & nbd_v2
+		#set_union = nbd_v1 | nbd_v2
+				
+		if frac:
+			den_node_intersection = len(set_intersection)*(len(set_intersection)-1)*0.5
+			#den_node_union = len(set_union)*(len(set_union)-1)*0.5
+		else:
+			den_node_intersection = 1
+			#den_node_union = 1
+
+		
+		node_inter_arr[set_intersection] = 1/den_node_intersection
+		#node_union_arr[set_union] = 1/den_node_union
+		#edgeFeature[e] = np.concatenate((node_inter_arr, node_union_arr), axis=None)
+		edgeFeature[e] = np.array(node_inter_arr, dtype=int)
+
+	return edgeFeature
+
+def getFeatureVecFromDic(feature_dic, G_line):
+	featureMat = []
+	for e in G_line.nodes():
+		feature = feature_dic[e]
+		featureMat.append(feature)
+	return featureMat
+
+def getMappedGraph(G_line):
+	node_map = {}
+	map_graph = nx.Graph()
+	for i, line_node in enumerate(G_line.nodes()):
+		line_node = getEdge(line_node)
+		node_map[line_node] = i
+		map_graph.add_node(i)
+
+	for line_edge in G_line.edges():
+		l_e0 = getEdge(line_edge[0])
+		l_e1 = getEdge(line_edge[1])
+		map_graph.add_edge(node_map[l_e0], node_map[l_e1])
+
+	return map_graph, node_map
+
+def getFeaturesOneHotPCA(featureMat):
+	from sklearn.decomposition import PCA
+	pca = PCA(n_components=20)
+	featureMat = pca.fit_transform(featureMat)
+	return torch.tensor(featureMat).float()
+
+def setLabelByGT(y, edge_dic, node_map):
+	for e in edge_dic:
+		node = node_map[e]
+		if edge_dic[e] == no_of_perm:
+			y[node] = 1
+		else:
+			y[node] = 0
+	return y
+
+def divideNodes(edge_dic, node_map):
+	nodes_label0 = []
+	nodes_label100 = []
+	for e in edge_dic:
+		if edge_dic[e] == 0:
+			nodes_label0.append(node_map[e])
+		else:
+			nodes_label100.append(node_map[e])
+	return nodes_label0, nodes_label100
+
+def computeGCNLine(G, edge_dic):
+	G_line = nx.line_graph(G)
+	feature_dic = computeFeatures_GCN_node(G)
+	featureSet = getFeatureVecFromDic(feature_dic, G_line)
+	featureSet = getFeaturesOneHotPCA(featureSet)
+	map_graph, node_map = getMappedGraph(G_line)
+	dataset = torchData2(map_graph, featureSet=featureSet) #-- user defined feature vectors
+	g1_data = dataset[0]
+	#set the train mask
+	#--randomized
+	#set the labels
+	g1_data.y = setLabelByGT(g1_data.y, edge_dic, node_map)
+	#choose the training nodes
+	#select a few(10%) random training nodes
+	
+	train_perct = 0.15
+	
+	nodes_label0, nodes_label100 = divideNodes(edge_dic, node_map)
+	train_nodes_label0 = rnd.sample(nodes_label0, int((rnd.random()%train_perct)*len(nodes_label0)))
+	train_nodes_label100 = rnd.sample(nodes_label100, int((rnd.random()%train_perct)*len(nodes_label100)))
+	#print(train_nodes_label0, train_nodes_label100)
+	train_ids = np.array(train_nodes_label0 + train_nodes_label100)
+	
+	#train_ids = rnd.sample(range(len(node_map)), int(train_perct*len(node_map))) #Random nodes of train_perct size
+	#train_ids, _ = getInInterventedTrainingNodes(G_line, g1_data, class1, class2)
+	g1_data.__setitem__("Train_Mask",torch.Tensor.long(torch.Tensor(train_ids)))
+
+	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+	# Generate the model.
+	model = Net(dataset).to(device)
+	data = g1_data.to(device)
+	optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+
+	#TRAIN the model
+	model.train() # It sets the mode to train 
+	for epoch in range(200):
+		optimizer.zero_grad()
+		out = model(data)
+		loss = F.nll_loss(out[data.Train_Mask], data.y[data.Train_Mask])
+		loss.backward()
+		optimizer.step()
+
+	model.eval()
+	_, pred = model(data).max(dim=1) #Ignore a value when unpacking 
+	#compute the f1-scores
+	B0 = [];B100 = []
+	for line_node in G_line.nodes():
+		if pred[node_map[line_node]] == 0:
+			B0.append(line_node)
+		else:
+			B100.append(line_node)
+
+	CM = [[0,0],[0,0]]
+	computeCM2(B0, 0, CM, edge_dic)
+	computeCM2(B100, 1, CM, edge_dic)
+	f1_100 = ComputePRA2(CM)
+	return B0, B100
+
+
 ########################### fetching ground truth- end ###########################
 
 def get100EdgeList(edge_dic):
