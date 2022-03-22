@@ -30,5 +30,5 @@ if __name__ == "__main__":
     elif args.th == 'bilevel':
         B0, B100= computeFilteredBalanced(G, edge_dic) 
     elif args.th == 'gcn':
-        B0, B100= computeGCNLine(G, edge_dic)
+        B0, B100= gcn_optuna(G, edge_dic)
 

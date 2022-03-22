@@ -7,6 +7,9 @@ import numpy as np
 import otsu
 import array as arr
 import copy
+import optuna
+from optuna.trial import TrialState
+import torch.optim as optim
 ########################### Precision,Recall and Accuracy - start ###########################
 
 def computeCM2(B, k, CM, edge_dic):
@@ -18,7 +21,7 @@ def computeCM2(B, k, CM, edge_dic):
 			CM[k][1] += 1
 
 
-def ComputePRA2(CM):
+def ComputePRA2(CM, printed=True):
 	if(CM[0][0] == 0):
 		p0 = 0
 		r0 = 0
@@ -43,23 +46,24 @@ def ComputePRA2(CM):
 	else:
 		F1_100 = 2*p100*r100/(p100+r100)
 
-	print('Confusion Matrix: ',CM)
-	print('*********************************************')
-	print('Precision for 0: ',p0)
-	print('Precision for 100: ',p100)
-	print('*********************************************')
-	print('Recall for 0: ',r0)
-	print('Recall for 100: ',r100)
-	print('*********************************************')
-	print('Accuracy: ',(CM[0][0] + CM[1][1])/((CM[0][0]+CM[0][1]) + (CM[1][0]+CM[1][1])))
-	print('*********************************************')
-	print('F1-score for 0: ', F1_0)
-	print('F1-score for 100: ', F1_100)
-	print('*********************************************')
-	print('Macro precision: ',(p0+p100)/2)
-	print('Macro recall: ',(r0+r100)/2)
-	print('*********************************************')
-	print('Macro F1: ',(F1_0+F1_100)/2)
+	if printed:
+		print('Confusion Matrix: ',CM)
+		print('*********************************************')
+		print('Precision for 0: ',p0)
+		print('Precision for 100: ',p100)
+		print('*********************************************')
+		print('Recall for 0: ',r0)
+		print('Recall for 100: ',r100)
+		print('*********************************************')
+		print('Accuracy: ',(CM[0][0] + CM[1][1])/((CM[0][0]+CM[0][1]) + (CM[1][0]+CM[1][1])))
+		print('*********************************************')
+		print('F1-score for 0: ', F1_0)
+		print('F1-score for 100: ', F1_100)
+		print('*********************************************')
+		print('Macro precision: ',(p0+p100)/2)
+		print('Macro recall: ',(r0+r100)/2)
+		print('*********************************************')
+		print('Macro F1: ',(F1_0+F1_100)/2)
 
 	return F1_100
 
@@ -1557,34 +1561,41 @@ def computeFeatures_GCN_node(G, frac=False):
 	edgeFeature = {}
 	num_node = G.number_of_nodes()
 	num_edge = G.size()
+	removingEdgeSet = set([])
 	for e in G.edges():
-		e = getEdge(e)
 		v1 = e[0]
 		v2 = e[1]
+		e = getEdge(e)
 		node_inter_arr = np.zeros(num_node)
-		#node_union_arr = np.zeros(num_node)
+		node_union_arr = np.zeros(num_node)
 		if node_deg[v1] == 1 or node_deg[v2] == 1:#No common nodes and edges
-			edgeFeature[e] = np.array([0 for i in range(num_node)])
+			edgeFeature[e] = np.array([0 for i in range(2*(num_node + 0))])
+			removingEdgeSet.add(e)
 			continue
 			
 		nbd_v1 = intbitset([n1 for n1 in G.neighbors(v1)])
 		nbd_v2 = intbitset([n1 for n1 in G.neighbors(v2)])
 				
 		set_intersection = nbd_v1 & nbd_v2
-		#set_union = nbd_v1 | nbd_v2
+		set_union = nbd_v1 | nbd_v2
 				
 		if frac:
 			den_node_intersection = len(set_intersection)*(len(set_intersection)-1)*0.5
-			#den_node_union = len(set_union)*(len(set_union)-1)*0.5
+			den_node_union = len(set_union)*(len(set_union)-1)*0.5
 		else:
 			den_node_intersection = 1
-			#den_node_union = 1
+			den_node_union = 1
 
+		if den_node_intersection == 0:
+			den_node_intersection = 1
+		if den_node_union == 0:
+			den_node_union = 1
 		
 		node_inter_arr[set_intersection] = 1/den_node_intersection
-		#node_union_arr[set_union] = 1/den_node_union
-		#edgeFeature[e] = np.concatenate((node_inter_arr, node_union_arr), axis=None)
-		edgeFeature[e] = np.array(node_inter_arr, dtype=int)
+		node_union_arr[set_union] = 1/den_node_union
+		edgeFeature[e] = np.concatenate((node_inter_arr, node_union_arr), axis=None)
+		if len(set_intersection) == 0 or len(set_union) == 0:
+			removingEdgeSet.add(e)
 
 	return edgeFeature
 
@@ -1666,7 +1677,7 @@ def computeGCNLine(G, edge_dic):
 	# Generate the model.
 	model = Net(dataset).to(device)
 	data = g1_data.to(device)
-	optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+	optimizer = torch.optim.RMSprop(model.parameters(), lr=0.01, weight_decay=0.0008696455377456019)
 
 	#TRAIN the model
 	model.train() # It sets the mode to train 
@@ -1715,4 +1726,103 @@ def connectedComponents(G, edgeList):
 def getCommunityFromEdgeDic(G, edge_dic):
 	EdgeList = get100EdgeList(edge_dic)
 	return connectedComponents(G, EdgeList)
+
+######################################### -- Optuna --######################################
+
+
+
+def gcn_optuna(G, edge_dic):
+	G_line = nx.line_graph(G)
+	map_graph, node_map = getMappedGraph(G_line)
+
+	feature_dic = computeFeatures_GCN_node(G)
+	#creating the feature set
+	featureSet = getFeatureVecFromDic(feature_dic, G_line)
+
+	featureSet = getFeaturesOneHotPCA(featureSet)
+	dataset = torchData2(map_graph, featureSet=featureSet) #-- user defined feature vectors
+	B0 = [];B100 = []
+
+	def objective(trial):	
+		g1_data = dataset[0]
+		#set the train mask
+		#--randomized
+		#set the labels
+		g1_data.y = setLabelByGT(g1_data.y, edge_dic, node_map)
+		#choose the training nodes
+		#select a few(10%) random training nodes
+		
+		train_perct = 0.1
+		
+		nodes_label0, nodes_label100 = divideNodes(edge_dic, node_map)
+		train_nodes_label0 = rnd.sample(nodes_label0, int((rnd.random()%0.2)*len(nodes_label0)))
+		train_nodes_label100 = rnd.sample(nodes_label100, int((rnd.random()%0.2)*len(nodes_label100)))
+		#print(train_nodes_label0, train_nodes_label100)
+		train_ids = np.array(train_nodes_label0 + train_nodes_label100)
+		
+		#train_ids = rnd.sample(range(len(node_map)), int(train_perct*len(node_map))) #Random nodes of train_perct size
+		#train_ids, _ = getInInterventedTrainingNodes(G_line, g1_data, class1, class2)
+		g1_data.__setitem__("Train_Mask",torch.Tensor.long(torch.Tensor(train_ids)))
+
+		device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+		# Generate the model.
+		model = Net(dataset).to(device)
+
+		# Generate the optimizers.
+		optimizer_name = trial.suggest_categorical("optimizer", ["Adam", "RMSprop", "SGD"])
+		lr = trial.suggest_float("lr", 1e-5, 1e-1, log=True)
+		weight_decay = trial.suggest_float("weight_decay", 5e-5, 5e-1, log=True)
+		optimizer = getattr(optim, optimizer_name)(model.parameters(), lr=lr, weight_decay=weight_decay)
+
+		
+		data = g1_data.to(device)
+		#optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+
+		#TRAIN the model
+		model.train() # It sets the mode to train 
+
+		for epoch in range(200):
+			optimizer.zero_grad()
+			out = model(data)
+			loss = F.nll_loss(out[data.Train_Mask], data.y[data.Train_Mask])
+			loss.backward()
+			optimizer.step()
+
+		model.eval()
+		
+		correct = 0
+
+		with torch.no_grad():
+			_, pred = model(data).max(dim=1)
+			correct = float (pred.eq(g1_data.y).sum().item())
+		accuracy = correct / len(g1_data.y)
+		
+		trial.report(accuracy, epoch)
+
+		if trial.should_prune():
+			raise optuna.exceptions.TrialPruned()
+		#print('Accuracy: ', accuracy)
+		#compute the f1-scores
+		B0 = [];B100 = []
+		for line_node in G_line.nodes():
+			if pred[node_map[line_node]] == 0:
+				B0.append(line_node)
+			else:
+				B100.append(line_node)
+
+		CM = [[0,0],[0,0]]
+		computeCM2(B0, 0, CM, edge_dic)
+		computeCM2(B100, 1, CM, edge_dic)
+		f1_100 = ComputePRA2(CM, printed=False)
+		return f1_100
+
+	study = optuna.create_study(direction="maximize")
+	study.optimize(objective, n_trials=200, timeout=6000)
+	trial = study.best_trial
+	print('F1 Score: {}'.format(trial.value))
+
+	print("Best hyperparameters: {}".format(trial.params))
+
+	return B0, B100
+
 
